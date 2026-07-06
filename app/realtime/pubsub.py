@@ -29,7 +29,7 @@ except ImportError:  # pragma: no cover
     aioredis = None  # type: ignore
 
 
-CHANNEL_PREFIX = "yary:ws:"
+CHANNEL_PREFIX = "flujoemergencia:ws:"
 
 
 class PubSubBroker:

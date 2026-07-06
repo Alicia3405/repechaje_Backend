@@ -68,7 +68,7 @@ def _limite(p: ReporteParams, default: int = 10) -> int:
 # Cache en memoria por celda redondeada; respeta el limite de 1 req/seg de
 # Nominatim. Si falla o no resuelve, cae a las coordenadas como etiqueta.
 _GEOCACHE: dict = {}
-_NOMINATIM_UA = "Yary-Reportes/1.0 (asistencia vial)"
+_NOMINATIM_UA = "FlujoEmergencia-Reportes/1.0 (asistencia vial)"
 _geo_ultimo = [0.0]
 
 
