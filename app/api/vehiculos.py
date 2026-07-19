@@ -453,4 +453,72 @@ def listar_mantenimientos(
     ).all()
     
     return mantenimientos
+@router.put(
+    "/{id_vehiculo}/mantenimientos/{id_mantenimiento}",
+    response_model=MantenimientoResponse,
+    summary="Actualizar un mantenimiento"
+)
+def actualizar_mantenimiento(
+    id_vehiculo: int,
+    id_mantenimiento: int,
+    mantenimiento_in: MantenimientoCreate,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user)
+):
+    vehiculo = db.query(Vehiculo).filter(
+        Vehiculo.id_vehiculo == id_vehiculo,
+        Vehiculo.id_usuario == current_user.id_usuario,
+        Vehiculo.activo == True
+    ).first()
+    
+    if not vehiculo:
+        raise HTTPException(status_code=404, detail="Vehículo no encontrado")
+        
+    mantenimiento = db.query(Mantenimiento).filter(
+        Mantenimiento.id == id_mantenimiento,
+        Mantenimiento.id_vehiculo == id_vehiculo
+    ).first()
+    
+    if not mantenimiento:
+        raise HTTPException(status_code=404, detail="Mantenimiento no encontrado")
+        
+    mantenimiento.tipo_mantenimiento = mantenimiento_in.tipo_mantenimiento
+    mantenimiento.fecha_ultimo = mantenimiento_in.fecha_ultimo
+    mantenimiento.fecha_proximo = mantenimiento_in.fecha_proximo
+    mantenimiento.estado = mantenimiento_in.estado
+    
+    db.commit()
+    db.refresh(mantenimiento)
+    return mantenimiento
 
+@router.delete(
+    "/{id_vehiculo}/mantenimientos/{id_mantenimiento}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Eliminar un mantenimiento"
+)
+def eliminar_mantenimiento(
+    id_vehiculo: int,
+    id_mantenimiento: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user)
+):
+    vehiculo = db.query(Vehiculo).filter(
+        Vehiculo.id_vehiculo == id_vehiculo,
+        Vehiculo.id_usuario == current_user.id_usuario,
+        Vehiculo.activo == True
+    ).first()
+    
+    if not vehiculo:
+        raise HTTPException(status_code=404, detail="Vehículo no encontrado")
+        
+    mantenimiento = db.query(Mantenimiento).filter(
+        Mantenimiento.id == id_mantenimiento,
+        Mantenimiento.id_vehiculo == id_vehiculo
+    ).first()
+    
+    if not mantenimiento:
+        raise HTTPException(status_code=404, detail="Mantenimiento no encontrado")
+        
+    db.delete(mantenimiento)
+    db.commit()
+    return None
