@@ -97,7 +97,8 @@ def listar_talleres_publicos(db: Session = Depends(get_db)):
             "email": t.email,
             "activo": t.activo,
             "verificado": t.verificado,
-            "rating_promedio": evals.get(t.id_taller)
+            "rating_promedio": evals.get(t.id_taller),
+            "total_servicios": t.total_servicios,
         })
     return result
 
