@@ -724,48 +724,52 @@ def obtener_incidencia(
 
     Validación de seguridad: Solo puede acceder a sus propias incidencias
     """
-    incidente = db.query(Incidente).filter(
-        Incidente.id_incidente == id_incidente
-    ).first()
-
-    if not incidente:
-        raise HTTPException(
-            status_code=404,
-            detail="Incidencia no encontrada"
-        )
-        
-    is_owner = (incidente.id_usuario == current_user.id_usuario)
-    is_admin = (current_user.id_rol == 4)
-    is_assigned = False
+    tok = current_tenant.set(0)
+    try:
+        incidente = db.query(Incidente).filter(
+            Incidente.id_incidente == id_incidente
+        ).first()
     
-    if not (is_owner or is_admin):
-        from app.models.asignacion import Asignacion
-        from app.models.usuario_taller import UsuarioTaller
+        if not incidente:
+            raise HTTPException(
+                status_code=404,
+                detail="Incidencia no encontrada"
+            )
+            
+        is_owner = (incidente.id_usuario == current_user.id_usuario)
+        is_admin = (current_user.id_rol == 4)
+        is_assigned = False
         
-        asignaciones = db.query(Asignacion).filter_by(id_incidente=id_incidente).all()
-        for asig in asignaciones:
-            if asig.id_usuario == current_user.id_usuario:
-                is_assigned = True
-                break
-            taller_rel = db.query(UsuarioTaller).filter_by(id_usuario=current_user.id_usuario, id_taller=asig.id_taller).first()
-            if taller_rel:
-                is_assigned = True
-                break
-                
-    if not (is_owner or is_admin or is_assigned):
-        raise HTTPException(
-            status_code=403,
-            detail="No tienes permiso para ver esta incidencia"
-        )
-
-    evaluacion = db.query(Evaluacion).filter(Evaluacion.id_incidente == id_incidente).first()
-    if is_owner:
-        ya_evaluado = evaluacion is not None and evaluacion.estrellas is not None
-    else:
-        ya_evaluado = evaluacion is not None and evaluacion.estrellas_taller is not None
-        
-    setattr(incidente, "evaluado", ya_evaluado)
-    return incidente
+        if not (is_owner or is_admin):
+            from app.models.asignacion import Asignacion
+            from app.models.usuario_taller import UsuarioTaller
+            
+            asignaciones = db.query(Asignacion).filter_by(id_incidente=id_incidente).all()
+            for asig in asignaciones:
+                if asig.id_usuario == current_user.id_usuario:
+                    is_assigned = True
+                    break
+                taller_rel = db.query(UsuarioTaller).filter_by(id_usuario=current_user.id_usuario, id_taller=asig.id_taller).first()
+                if taller_rel:
+                    is_assigned = True
+                    break
+                    
+        if not (is_owner or is_admin or is_assigned):
+            raise HTTPException(
+                status_code=403,
+                detail="No tienes permiso para ver esta incidencia"
+            )
+    
+        evaluacion = db.query(Evaluacion).filter(Evaluacion.id_incidente == id_incidente).first()
+        if is_owner:
+            ya_evaluado = evaluacion is not None and evaluacion.estrellas is not None
+        else:
+            ya_evaluado = evaluacion is not None and evaluacion.estrellas_taller is not None
+            
+        setattr(incidente, "evaluado", ya_evaluado)
+        return incidente
+    finally:
+        current_tenant.reset(tok)
 
 
 @router.get(
@@ -950,73 +954,77 @@ def evaluar_servicio(
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
 ):
-    # 1. Verificar existencia del incidente
-    incidente = db.query(Incidente).filter(
-        Incidente.id_incidente == id_incidente,
-    ).first()
-    if not incidente:
-        raise HTTPException(
-            status_code=404,
-            detail="Incidencia no encontrada",
+    tok = current_tenant.set(0)
+    try:
+        # 1. Verificar existencia del incidente
+        incidente = db.query(Incidente).filter(
+            Incidente.id_incidente == id_incidente,
+        ).first()
+        if not incidente:
+            raise HTTPException(
+                status_code=404,
+                detail="Incidencia no encontrada",
+            )
+    
+        # 2. Solo se puede evaluar un incidente atendido
+        estado = db.get(EstadoIncidente, incidente.id_estado)
+        if not estado or estado.nombre != "atendido":
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Solo puedes evaluar incidentes en estado 'atendido'. "
+                    f"Estado actual: '{estado.nombre if estado else '?'}'."
+                ),
+            )
+    
+        # 3. Buscar asignación completada para vincular
+        asignacion_completada = (
+            db.query(Asignacion)
+            .filter(Asignacion.id_incidente == id_incidente)
+            .join(EstadoAsignacion)
+            .filter(EstadoAsignacion.nombre == "completada")
+            .first()
         )
-
-    # 2. Solo se puede evaluar un incidente atendido
-    estado = db.get(EstadoIncidente, incidente.id_estado)
-    if not estado or estado.nombre != "atendido":
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                f"Solo puedes evaluar incidentes en estado 'atendido'. "
-                f"Estado actual: '{estado.nombre if estado else '?'}'."
-            ),
-        )
-
-    # 3. Buscar asignación completada para vincular
-    asignacion_completada = (
-        db.query(Asignacion)
-        .filter(Asignacion.id_incidente == id_incidente)
-        .join(EstadoAsignacion)
-        .filter(EstadoAsignacion.nombre == "completada")
-        .first()
-    )
-    if not asignacion_completada:
-        raise HTTPException(
-            status_code=400,
-            detail="No hay asignación completada para este incidente",
-        )
-
-    is_cliente = current_user.id_usuario == incidente.id_usuario
-
-    if not is_cliente:
-        # Verificar que el usuario pertenece al taller asignado
-        from app.models.usuario_taller import UsuarioTaller
-        taller_rel = db.query(UsuarioTaller).filter_by(id_usuario=current_user.id_usuario, id_taller=asignacion_completada.id_taller).first()
-        # Si no es del taller y tampoco es admin, rechazar
-        if not taller_rel and current_user.id_rol != 4:
-            raise HTTPException(status_code=403, detail="No autorizado para evaluar esta incidencia")
-
-    # 4. Manejar rol del usuario y actualizar/crear
-    evaluacion = db.query(Evaluacion).filter_by(id_incidente=id_incidente).first()
-    if not evaluacion:
-        evaluacion = Evaluacion(
-            id_incidente=id_incidente,
-            id_usuario=incidente.id_usuario,
-            id_taller=asignacion_completada.id_taller,
-        )
-        db.add(evaluacion)
-
-    if is_cliente:
-        if evaluacion.estrellas is not None:
-            raise HTTPException(status_code=409, detail="Ya evaluaste este servicio")
-        evaluacion.estrellas = payload.estrellas
-        evaluacion.comentario = payload.comentario
-    else:
-        # Asumimos que es el técnico/taller
-        if evaluacion.estrellas_taller is not None:
-            raise HTTPException(status_code=409, detail="Ya evaluaste al cliente")
-        evaluacion.estrellas_taller = payload.estrellas
-        evaluacion.comentario_taller = payload.comentario
-
-    db.commit()
-    db.refresh(evaluacion)
-    return evaluacion
+        if not asignacion_completada:
+            raise HTTPException(
+                status_code=400,
+                detail="No hay asignación completada para este incidente",
+            )
+    
+        is_cliente = current_user.id_usuario == incidente.id_usuario
+    
+        if not is_cliente:
+            # Verificar que el usuario pertenece al taller asignado
+            from app.models.usuario_taller import UsuarioTaller
+            taller_rel = db.query(UsuarioTaller).filter_by(id_usuario=current_user.id_usuario, id_taller=asignacion_completada.id_taller).first()
+            # Si no es del taller y tampoco es admin, rechazar
+            if not taller_rel and current_user.id_rol != 4:
+                raise HTTPException(status_code=403, detail="No autorizado para evaluar esta incidencia")
+    
+        # 4. Manejar rol del usuario y actualizar/crear
+        evaluacion = db.query(Evaluacion).filter_by(id_incidente=id_incidente).first()
+        if not evaluacion:
+            evaluacion = Evaluacion(
+                id_incidente=id_incidente,
+                id_usuario=incidente.id_usuario,
+                id_taller=asignacion_completada.id_taller,
+            )
+            db.add(evaluacion)
+    
+        if is_cliente:
+            if evaluacion.estrellas is not None:
+                raise HTTPException(status_code=409, detail="Ya evaluaste este servicio")
+            evaluacion.estrellas = payload.estrellas
+            evaluacion.comentario = payload.comentario
+        else:
+            # Asumimos que es el técnico/taller
+            if evaluacion.estrellas_taller is not None:
+                raise HTTPException(status_code=409, detail="Ya evaluaste al cliente")
+            evaluacion.estrellas_taller = payload.estrellas
+            evaluacion.comentario_taller = payload.comentario
+    
+        db.commit()
+        db.refresh(evaluacion)
+        return evaluacion
+    finally:
+        current_tenant.reset(tok)
