@@ -14,7 +14,15 @@ set -e
 # El baseline de Alembic (0001) esta VACIO: asume que las tablas base ya existen
 # via create_all. Por eso en una BD nueva y vacia `alembic upgrade head` falla al
 # crear tenant_user (FK a usuario) porque usuario aun no existe.
-# Solucion: create_all (idempotente, respeta el orden de dependencias FK) + stamp head.
+# Solucion: drop de todo si es SEED, luego create_all (idempotente) + stamp head.
+
+if [ "${SEED_ON_STARTUP:-true}" = "true" ]; then
+    echo "==> [start.sh] SEED_ON_STARTUP=true -> Limpiando el esquema anterior por completo"
+    python -c "from app.db.session import engine; from sqlalchemy import text; 
+with engine.begin() as conn:
+    conn.execute(text('DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO public;'))"
+fi
+
 echo "==> [start.sh] Creando esquema desde los modelos (create_all, idempotente)"
 python -c "import app.models; from app.db.session import Base, engine; Base.metadata.create_all(bind=engine)"
 
