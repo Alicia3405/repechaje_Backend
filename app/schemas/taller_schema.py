@@ -40,6 +40,7 @@ class TallerResponse(BaseModel):
     activo: bool
     verificado: bool
     rating_promedio: Optional[float] = None
+    total_servicios: Optional[int] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
 

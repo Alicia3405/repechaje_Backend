@@ -54,6 +54,17 @@ class Taller(Base):
             return None
         return round(sum(evals_con_estrellas) / len(evals_con_estrellas), 2)
 
+    @property
+    def total_servicios(self):
+        # Cuenta todas las asignaciones de este taller que estén en estado completada (id_estado_asignacion == 4)
+        return sum(1 for a in self.asignaciones if a.id_estado_asignacion == 4)
+
+    @property
+    def slug(self):
+        return self.tenant.slug if self.tenant else ""
+
+
+
 
 class TallerServicio(Base):
     __tablename__ = "taller_servicio"

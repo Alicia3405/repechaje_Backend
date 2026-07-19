@@ -49,6 +49,7 @@ class TallerAdminResponse(BaseModel):
     activo: bool
     verificado: bool
     disponible: bool
+    slug: str
     created_at: datetime
     updated_at: datetime
 

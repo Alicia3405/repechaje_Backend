@@ -20,6 +20,9 @@ from app.schemas.user_schema import (
     TokenResponse,
     MensajeResponse
 )
+from app.schemas.taller_schema import TallerResponse
+from app.models.favorito import TallerFavorito
+from app.models.taller import Taller
 from app.core.security import (
     hash_password,
     verify_password,
@@ -322,3 +325,78 @@ def dar_de_baja_mi_cuenta(
         "mensaje": f"Tu cuenta ({current_user.email}) ha sido desactivada correctamente. "
                    f"Tus datos se mantienen para trazabilidad de incidentes y pagos."
     }
+
+
+@router.post(
+    "/favoritos/{id_taller}",
+    response_model=MensajeResponse,
+    summary="Añadir taller a favoritos",
+    description="Agrega un taller a la lista de favoritos del cliente autenticado."
+)
+def agregar_favorito(
+    id_taller: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user)
+):
+    if current_user.id_rol != 1:
+        raise HTTPException(status_code=403, detail="Solo los clientes pueden agregar favoritos")
+    
+    taller = db.query(Taller).filter(Taller.id_taller == id_taller, Taller.activo == True).first()
+    if not taller:
+        raise HTTPException(status_code=404, detail="Taller no encontrado o inactivo")
+        
+    existente = db.query(TallerFavorito).filter(
+        TallerFavorito.id_usuario == current_user.id_usuario,
+        TallerFavorito.id_taller == id_taller
+    ).first()
+    
+    if existente:
+        return {"mensaje": "El taller ya está en tus favoritos"}
+        
+    nuevo_favorito = TallerFavorito(id_usuario=current_user.id_usuario, id_taller=id_taller)
+    db.add(nuevo_favorito)
+    db.commit()
+    
+    return {"mensaje": "Taller agregado a favoritos exitosamente"}
+
+
+@router.delete(
+    "/favoritos/{id_taller}",
+    response_model=MensajeResponse,
+    summary="Quitar taller de favoritos"
+)
+def quitar_favorito(
+    id_taller: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user)
+):
+    favorito = db.query(TallerFavorito).filter(
+        TallerFavorito.id_usuario == current_user.id_usuario,
+        TallerFavorito.id_taller == id_taller
+    ).first()
+    
+    if not favorito:
+        raise HTTPException(status_code=404, detail="El taller no está en tus favoritos")
+        
+    db.delete(favorito)
+    db.commit()
+    
+    return {"mensaje": "Taller removido de favoritos"}
+
+
+@router.get(
+    "/favoritos",
+    response_model=list[TallerResponse],
+    summary="Listar mis talleres favoritos"
+)
+def listar_favoritos(
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user)
+):
+    favoritos = db.query(TallerFavorito).filter(
+        TallerFavorito.id_usuario == current_user.id_usuario
+    ).all()
+    
+    # Extraer los talleres de los favoritos
+    return [fav.taller for fav in favoritos if fav.taller.activo]
+

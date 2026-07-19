@@ -24,6 +24,10 @@ from app.core.tenant_filter import install_tenant_filter
 from app.core.rate_limit import limiter
 from app.realtime import pubsub_broker
 from app.realtime.endpoints import router as ws_router
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from app.cron.mantenimientos import notificar_mantenimientos_diarios
+
+scheduler = AsyncIOScheduler()
 
 # Obtener configuración
 settings = get_settings()
@@ -175,11 +179,14 @@ async def rate_limit_handler(request, exc):
 @app.on_event("startup")
 async def _start_realtime() -> None:
     await pubsub_broker.start()
+    scheduler.add_job(notificar_mantenimientos_diarios, "cron", hour=1, minute=0)
+    scheduler.start()
 
 
 @app.on_event("shutdown")
 async def _stop_realtime() -> None:
     await pubsub_broker.stop()
+    scheduler.shutdown()
 
 
 if __name__ == "__main__":

@@ -251,3 +251,47 @@ def run(db: Session, ctx: Ctx) -> None:
         db.commit()
 
     logger.info(f"[historico] {total} incidentes terminales sembrados en {DIAS_HISTORIA} dias")
+
+    # ── Poblar Favoritos y Mantenimientos ───────────────────────────────
+    try:
+        from app.models.favorito import TallerFavorito
+        from app.models.usuario import Vehiculo
+        from app.models.mantenimiento import Mantenimiento
+        
+        # Favoritos: cada cliente tiene 2 o 3 talleres favoritos
+        total_favs = 0
+        for ckey, cliente in ctx.clientes.items():
+            k = rnd.randint(2, 3)
+            # Elegir talleres distintos
+            t_idxs = rnd.sample(range(n_talleres), min(k, n_talleres))
+            for t_idx in t_idxs:
+                taller = ctx.talleres[t_idx]
+                db.add(TallerFavorito(
+                    id_usuario=cliente.id_usuario,
+                    id_taller=taller.id_taller
+                ))
+                total_favs += 1
+                
+        # Mantenimientos: programar algunos para hoy o mañana
+        total_mant = 0
+        tipos_mant = ["Cambio de aceite", "Pastillas de freno", "Alineacion", "Filtro de aire"]
+        for ckey, cliente in ctx.clientes.items():
+            vehiculo = ctx.vehiculos.get(ckey)
+            if vehiculo and rnd.random() < 0.4:  # 40% de clientes tienen un mantenimiento proximo
+                es_hoy = rnd.choice([True, False])
+                delta_dias = 0 if es_hoy else 1
+                fecha_prox = ahora + timedelta(days=delta_dias)
+                db.add(Mantenimiento(
+                    id_vehiculo=vehiculo.id_vehiculo,
+                    tipo_mantenimiento=rnd.choice(tipos_mant),
+                    fecha_ultimo=ahora - timedelta(days=180),
+                    fecha_proximo=fecha_prox,
+                    estado='Activo'
+                ))
+                total_mant += 1
+                
+        db.commit()
+        logger.info(f"[historico] {total_favs} favoritos y {total_mant} mantenimientos sembrados")
+    except Exception as e:
+        logger.error(f"[historico] Error al poblar favoritos/mantenimientos: {e}")
+        db.rollback()

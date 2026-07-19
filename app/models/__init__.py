@@ -17,6 +17,7 @@ from app.models.usuario import Usuario, Vehiculo
 from app.models.mantenimiento import Mantenimiento
 from app.models.taller import Taller, TallerServicio
 from app.models.usuario_taller import UsuarioTaller
+from app.models.favorito import TallerFavorito
 from app.models.incidente import (
     Incidente,
     Asignacion,
@@ -54,6 +55,8 @@ __all__ = [
     "Taller",
     "TallerServicio",
     "Tecnico",
+    "UsuarioTaller",
+    "TallerFavorito",
     # Incidentes y asignaciones
     "Incidente",
     "Asignacion",
