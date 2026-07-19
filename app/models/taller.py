@@ -44,6 +44,16 @@ class Taller(Base):
     evaluaciones = relationship("Evaluacion", back_populates="taller", cascade="all, delete-orphan")
     tenant = relationship("Tenant", back_populates="talleres")
 
+    @property
+    def rating_promedio(self):
+        if not self.evaluaciones:
+            return None
+        # Solo promediar si tienen estrellas (de cliente a taller)
+        evals_con_estrellas = [e.estrellas for e in self.evaluaciones if e.estrellas is not None]
+        if not evals_con_estrellas:
+            return None
+        return round(sum(evals_con_estrellas) / len(evals_con_estrellas), 2)
+
 
 class TallerServicio(Base):
     __tablename__ = "taller_servicio"

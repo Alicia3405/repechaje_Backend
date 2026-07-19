@@ -33,6 +33,33 @@ class Usuario(Base):
     asignaciones_tecnico = relationship("Asignacion", back_populates="usuario_tecnico", foreign_keys="Asignacion.id_usuario")
     talleres_asociados = relationship("UsuarioTaller", back_populates="usuario", cascade="all, delete-orphan")
 
+    @property
+    def rating_promedio(self):
+        if self.id_rol != 1:  # Only for clients
+            return None
+        
+        # We need to get all evaluaciones where this user is the client (id_usuario)
+        # and estrellas_taller is not null.
+        # But Evaluacion model is not directly imported here to avoid circular imports.
+        # Let's import it locally.
+        from app.models.incidente import Evaluacion
+        from app.db.session import SessionLocal
+        
+        db = SessionLocal()
+        try:
+            evaluaciones = db.query(Evaluacion).filter(
+                Evaluacion.id_usuario == self.id_usuario,
+                Evaluacion.estrellas_taller.isnot(None)
+            ).all()
+            
+            if not evaluaciones:
+                return None
+                
+            total = sum(e.estrellas_taller for e in evaluaciones)
+            return round(total / len(evaluaciones), 2)
+        finally:
+            db.close()
+
 
 class Vehiculo(Base):
     __tablename__ = "vehiculo"

@@ -189,8 +189,11 @@ class Evaluacion(Base):
     id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=False)
     id_taller = Column(Integer, ForeignKey("taller.id_taller"), nullable=False)
     
-    estrellas = Column(Integer, nullable=False)  # 1-5
+    estrellas = Column(Integer, nullable=True)  # Cliente califica al taller (1-5)
     comentario = Column(Text, nullable=True)
+    
+    estrellas_taller = Column(Integer, nullable=True)   # Taller califica al cliente (1-5)
+    comentario_taller = Column(Text, nullable=True)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 

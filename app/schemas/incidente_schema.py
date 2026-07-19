@@ -215,8 +215,10 @@ class EvaluacionResponse(BaseModel):
     id_incidente: int
     id_taller: int
     id_tecnico: Optional[int] = None
-    estrellas: int
+    estrellas: Optional[int] = None
     comentario: Optional[str] = None
+    estrellas_taller: Optional[int] = None
+    comentario_taller: Optional[str] = None
     created_at: datetime
 
     class Config:

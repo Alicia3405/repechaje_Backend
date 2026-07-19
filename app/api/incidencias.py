@@ -927,15 +927,14 @@ def evaluar_servicio(
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
 ):
-    # 1. Verificar ownership del incidente
+    # 1. Verificar existencia del incidente
     incidente = db.query(Incidente).filter(
         Incidente.id_incidente == id_incidente,
-        Incidente.id_usuario == current_user.id_usuario,
     ).first()
     if not incidente:
         raise HTTPException(
             status_code=404,
-            detail="Incidencia no encontrada o no te pertenece",
+            detail="Incidencia no encontrada",
         )
 
     # 2. Solo se puede evaluar un incidente atendido
@@ -949,15 +948,7 @@ def evaluar_servicio(
             ),
         )
 
-    # 3. No permitir evaluaciones duplicadas
-    existente = db.query(Evaluacion).filter_by(id_incidente=id_incidente).first()
-    if existente:
-        raise HTTPException(
-            status_code=409,
-            detail="Ya evaluaste este servicio",
-        )
-
-    # 4. Buscar la asignación completada para vincular taller y técnico
+    # 3. Buscar asignación completada para vincular
     asignacion_completada = (
         db.query(Asignacion)
         .filter(Asignacion.id_incidente == id_incidente)
@@ -971,15 +962,38 @@ def evaluar_servicio(
             detail="No hay asignación completada para este incidente",
         )
 
-    # 5. Crear la evaluación
-    evaluacion = Evaluacion(
-        id_incidente=id_incidente,
-        id_usuario=current_user.id_usuario,
-        id_taller=asignacion_completada.id_taller,
-        estrellas=payload.estrellas,
-        comentario=payload.comentario,
-    )
-    db.add(evaluacion)
+    is_cliente = current_user.id_usuario == incidente.id_usuario
+
+    if not is_cliente:
+        # Verificar que el usuario pertenece al taller asignado
+        from app.models.usuario_taller import UsuarioTaller
+        taller_rel = db.query(UsuarioTaller).filter_by(id_usuario=current_user.id_usuario, id_taller=asignacion_completada.id_taller).first()
+        # Si no es del taller y tampoco es admin, rechazar
+        if not taller_rel and current_user.id_rol != 4:
+            raise HTTPException(status_code=403, detail="No autorizado para evaluar esta incidencia")
+
+    # 4. Manejar rol del usuario y actualizar/crear
+    evaluacion = db.query(Evaluacion).filter_by(id_incidente=id_incidente).first()
+    if not evaluacion:
+        evaluacion = Evaluacion(
+            id_incidente=id_incidente,
+            id_usuario=incidente.id_usuario,
+            id_taller=asignacion_completada.id_taller,
+        )
+        db.add(evaluacion)
+
+    if is_cliente:
+        if evaluacion.estrellas is not None:
+            raise HTTPException(status_code=409, detail="Ya evaluaste este servicio")
+        evaluacion.estrellas = payload.estrellas
+        evaluacion.comentario = payload.comentario
+    else:
+        # Asumimos que es el técnico/taller
+        if evaluacion.estrellas_taller is not None:
+            raise HTTPException(status_code=409, detail="Ya evaluaste al cliente")
+        evaluacion.estrellas_taller = payload.estrellas
+        evaluacion.comentario_taller = payload.comentario
+
     db.commit()
     db.refresh(evaluacion)
     return evaluacion

@@ -49,6 +49,7 @@ class UsuarioResponse(BaseModel):
     email: str = Field(..., description="Email del usuario")
     telefono: Optional[str] = Field(None, description="Teléfono")
     activo: bool = Field(..., description="Si el usuario está activo")
+    rating_promedio: Optional[float] = Field(None, description="Rating promedio si aplica")
     created_at: datetime = Field(..., description="Fecha de creación")
     
     class Config:
