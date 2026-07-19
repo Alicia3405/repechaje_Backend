@@ -94,7 +94,9 @@ def login_tecnico(body: TecnicoLoginConTallerRequest, db: Session = Depends(get_
     # Se omite el filtro de tenant para localizar usuario y vínculo (sin contexto previo)
     tok = current_tenant.set(0)
     try:
-        usuario = db.query(Usuario).filter(Usuario.email == body.email).first()
+        from sqlalchemy import func
+        email_limpio = body.email.strip().lower()
+        usuario = db.query(Usuario).filter(func.lower(Usuario.email) == email_limpio).first()
         if not usuario or not verify_password(body.password, usuario.password_hash):
             raise HTTPException(401, "Credenciales invalidas")
         if usuario.id_rol != 3:

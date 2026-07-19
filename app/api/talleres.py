@@ -495,6 +495,20 @@ def editar_tecnico(
     ut = _get_tecnico_del_taller(db, current_taller.id_taller, id_usuario_taller)
     
     datos = tecnico_update.model_dump(exclude_unset=True)
+    
+    usuario = ut.usuario
+    if "nombre" in datos:
+        usuario.nombre = datos.pop("nombre")
+    if "email" in datos:
+        email_nuevo = datos.pop("email")
+        if email_nuevo != usuario.email:
+            existente = db.query(Usuario).filter(Usuario.email == email_nuevo).first()
+            if existente:
+                raise HTTPException(status_code=409, detail="El email ya está en uso por otro usuario")
+            usuario.email = email_nuevo
+    if "telefono" in datos:
+        usuario.telefono = datos.pop("telefono")
+
     for campo, valor in datos.items():
         if valor is not None:
             setattr(ut, campo, valor)

@@ -284,6 +284,8 @@ class UsuarioTallerCreate(BaseModel):
 
 class UsuarioTallerUpdate(BaseModel):
     """Actualizar datos de un técnico del taller"""
+    nombre: Optional[str] = Field(None, min_length=3, max_length=100, description="Nombre del técnico")
+    email: Optional[EmailStr] = Field(None, description="Email del técnico")
     disponible: Optional[bool] = Field(None, description="¿El técnico está disponible?")
     latitud: Optional[float] = Field(None, description="Ubicación actual del técnico (latitud)")
     longitud: Optional[float] = Field(None, description="Ubicación actual del técnico (longitud)")

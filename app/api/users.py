@@ -151,9 +151,11 @@ def login(
     ```
     """
     
+    from sqlalchemy import func
     # Buscar el usuario por email
+    email_limpio = credenciales.email.strip().lower()
     usuario = db.query(Usuario).filter(
-        Usuario.email == credenciales.email
+        func.lower(Usuario.email) == email_limpio
     ).first()
 
     if not usuario:
