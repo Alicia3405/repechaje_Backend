@@ -15,6 +15,7 @@ Los técnicos son usuarios con rol=3, se crean a través de /usuarios/registro.
 """
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from typing import List, Optional
 from math import radians, sin, cos, asin, sqrt
 from datetime import date
@@ -70,6 +71,36 @@ router = APIRouter(
 )
 
 
+# Información del taller
+
+@router.get(
+    "/",
+    summary="Listar todos los talleres públicos",
+)
+def listar_talleres_publicos(db: Session = Depends(get_db)):
+    talleres = db.query(Taller).filter(Taller.activo == True).all()
+    rows = (
+        db.query(
+            Evaluacion.id_taller,
+            func.avg(Evaluacion.estrellas).label("promedio"),
+        )
+        .group_by(Evaluacion.id_taller)
+        .all()
+    )
+    evals = {r.id_taller: round(float(r.promedio), 2) for r in rows if r.promedio}
+    
+    result = []
+    for t in talleres:
+        result.append({
+            "id_taller": t.id_taller,
+            "nombre": t.nombre,
+            "email": t.email,
+            "activo": t.activo,
+            "verificado": t.verificado,
+            "rating_promedio": evals.get(t.id_taller)
+        })
+    return result
+
 # Autenticación del taller
 
 @router.post(
@@ -108,13 +139,6 @@ def login_taller(credenciales: TallerLoginRequest, db: Session = Depends(get_db)
 
 
 # Información del taller
-
-@router.get("", response_model=List[TallerResponse], summary="Obtener lista de todos los talleres públicos")
-def obtener_talleres_publicos(db: Session = Depends(get_db)):
-    """
-    Publico (cliente explorando). Devuelve la lista de talleres registrados.
-    """
-    return db.query(Taller).filter(Taller.activo == True).all()
 
 @router.get("/mi-taller", response_model=TallerResponse, summary="Obtener mi taller")
 def obtener_mi_taller(current_taller: Taller = Depends(get_current_taller)):
