@@ -742,11 +742,15 @@ def obtener_incidencia(
         from app.models.asignacion import Asignacion
         from app.models.usuario_taller import UsuarioTaller
         
-        asignacion = db.query(Asignacion).filter_by(id_incidente=id_incidente).first()
-        if asignacion:
-            taller_rel = db.query(UsuarioTaller).filter_by(id_usuario=current_user.id_usuario, id_taller=asignacion.id_taller).first()
+        asignaciones = db.query(Asignacion).filter_by(id_incidente=id_incidente).all()
+        for asig in asignaciones:
+            if asig.id_usuario == current_user.id_usuario:
+                is_assigned = True
+                break
+            taller_rel = db.query(UsuarioTaller).filter_by(id_usuario=current_user.id_usuario, id_taller=asig.id_taller).first()
             if taller_rel:
                 is_assigned = True
+                break
                 
     if not (is_owner or is_admin or is_assigned):
         raise HTTPException(
