@@ -109,6 +109,13 @@ def login_taller(credenciales: TallerLoginRequest, db: Session = Depends(get_db)
 
 # Información del taller
 
+@router.get("", response_model=List[TallerResponse], summary="Obtener lista de todos los talleres públicos")
+def obtener_talleres_publicos(db: Session = Depends(get_db)):
+    """
+    Publico (cliente explorando). Devuelve la lista de talleres registrados.
+    """
+    return db.query(Taller).filter(Taller.activo == True).all()
+
 @router.get("/mi-taller", response_model=TallerResponse, summary="Obtener mi taller")
 def obtener_mi_taller(current_taller: Taller = Depends(get_current_taller)):
     return current_taller
