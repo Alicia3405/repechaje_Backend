@@ -79,7 +79,9 @@ router = APIRouter(
 )
 def listar_talleres_publicos(db: Session = Depends(get_db)):
     talleres = db.query(Taller).filter(Taller.activo == True).all()
-    rows = (
+    
+    # 1. Obtener promedios
+    rows_evals = (
         db.query(
             Evaluacion.id_taller,
             func.avg(Evaluacion.estrellas).label("promedio"),
@@ -87,7 +89,19 @@ def listar_talleres_publicos(db: Session = Depends(get_db)):
         .group_by(Evaluacion.id_taller)
         .all()
     )
-    evals = {r.id_taller: round(float(r.promedio), 2) for r in rows if r.promedio}
+    evals = {r.id_taller: round(float(r.promedio), 2) for r in rows_evals if r.promedio}
+    
+    # 2. Obtener conteo de servicios completados (estado 4)
+    rows_servs = (
+        db.query(
+            Asignacion.id_taller,
+            func.count(Asignacion.id_asignacion).label("total")
+        )
+        .filter(Asignacion.id_estado_asignacion == 4)
+        .group_by(Asignacion.id_taller)
+        .all()
+    )
+    servicios = {r.id_taller: r.total for r in rows_servs}
     
     result = []
     for t in talleres:
@@ -98,7 +112,7 @@ def listar_talleres_publicos(db: Session = Depends(get_db)):
             "activo": t.activo,
             "verificado": t.verificado,
             "rating_promedio": evals.get(t.id_taller),
-            "total_servicios": t.total_servicios,
+            "total_servicios": servicios.get(t.id_taller, 0),
         })
     return result
 
