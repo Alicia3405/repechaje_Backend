@@ -725,23 +725,42 @@ def obtener_incidencia(
     Validación de seguridad: Solo puede acceder a sus propias incidencias
     """
     incidente = db.query(Incidente).filter(
-        Incidente.id_incidente == id_incidente,
-        Incidente.id_usuario == current_user.id_usuario
+        Incidente.id_incidente == id_incidente
     ).first()
 
     if not incidente:
         raise HTTPException(
             status_code=404,
-            detail="Incidencia no encontrada o no tienes permiso para verla"
+            detail="Incidencia no encontrada"
+        )
+        
+    is_owner = (incidente.id_usuario == current_user.id_usuario)
+    is_admin = (current_user.id_rol == 4)
+    is_assigned = False
+    
+    if not (is_owner or is_admin):
+        from app.models.asignacion import Asignacion
+        from app.models.usuario_taller import UsuarioTaller
+        
+        asignacion = db.query(Asignacion).filter_by(id_incidente=id_incidente).first()
+        if asignacion:
+            taller_rel = db.query(UsuarioTaller).filter_by(id_usuario=current_user.id_usuario, id_taller=asignacion.id_taller).first()
+            if taller_rel:
+                is_assigned = True
+                
+    if not (is_owner or is_admin or is_assigned):
+        raise HTTPException(
+            status_code=403,
+            detail="No tienes permiso para ver esta incidencia"
         )
 
-    evaluado = (
-        db.query(Evaluacion.id_incidente)
-        .filter(Evaluacion.id_incidente == id_incidente)
-        .first()
-        is not None
-    )
-    setattr(incidente, "evaluado", evaluado)
+    evaluacion = db.query(Evaluacion).filter(Evaluacion.id_incidente == id_incidente).first()
+    if is_owner:
+        ya_evaluado = evaluacion is not None and evaluacion.estrellas is not None
+    else:
+        ya_evaluado = evaluacion is not None and evaluacion.estrellas_taller is not None
+        
+    setattr(incidente, "evaluado", ya_evaluado)
     return incidente
 
 
