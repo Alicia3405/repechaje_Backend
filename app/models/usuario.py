@@ -51,3 +51,4 @@ class Vehiculo(Base):
 
     usuario = relationship("Usuario", back_populates="vehiculos")
     incidentes = relationship("Incidente", back_populates="vehiculo")
+    mantenimientos = relationship("Mantenimiento", back_populates="vehiculo", cascade="all, delete-orphan")

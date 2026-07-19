@@ -14,6 +14,7 @@ from app.models.catalogos import (
     EstadoPago,
 )
 from app.models.usuario import Usuario, Vehiculo
+from app.models.mantenimiento import Mantenimiento
 from app.models.taller import Taller, TallerServicio
 from app.models.usuario_taller import UsuarioTaller
 from app.models.incidente import (
@@ -48,6 +49,7 @@ __all__ = [
     # Usuario / vehículos
     "Usuario",
     "Vehiculo",
+    "Mantenimiento",
     # Taller / técnicos
     "Taller",
     "TallerServicio",

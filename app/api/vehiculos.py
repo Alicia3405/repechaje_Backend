@@ -13,11 +13,16 @@ from typing import List
 
 from app.db.session import get_db
 from app.models.usuario import Usuario, Vehiculo
+from app.models.mantenimiento import Mantenimiento
 from app.schemas.vehiculo_schema import (
     VehiculoCreate,
     VehiculoResponse,
     VehiculoUpdate,
     MensajeResponse
+)
+from app.schemas.mantenimiento_schema import (
+    MantenimientoCreate,
+    MantenimientoResponse
 )
 from app.core.security import get_current_user
 
@@ -382,3 +387,70 @@ def eliminar_vehiculo(
         "mensaje": "Vehículo eliminado correctamente",
         "detalle": f"El vehículo con placa '{vehiculo.placa}' ha sido marcado como inactivo"
     }
+
+
+@router.post(
+    "/{id_vehiculo}/mantenimientos",
+    response_model=MantenimientoResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Registrar mantenimiento de un vehículo"
+)
+def registrar_mantenimiento(
+    id_vehiculo: int,
+    mantenimiento_in: MantenimientoCreate,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user)
+):
+    vehiculo = db.query(Vehiculo).filter(
+        Vehiculo.id_vehiculo == id_vehiculo,
+        Vehiculo.id_usuario == current_user.id_usuario,
+        Vehiculo.activo == True
+    ).first()
+    
+    if not vehiculo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Vehículo no encontrado"
+        )
+        
+    nuevo_mantenimiento = Mantenimiento(
+        id_vehiculo=id_vehiculo,
+        tipo_mantenimiento=mantenimiento_in.tipo_mantenimiento,
+        fecha_ultimo=mantenimiento_in.fecha_ultimo,
+        fecha_proximo=mantenimiento_in.fecha_proximo,
+        estado=mantenimiento_in.estado
+    )
+    db.add(nuevo_mantenimiento)
+    db.commit()
+    db.refresh(nuevo_mantenimiento)
+    return nuevo_mantenimiento
+
+
+@router.get(
+    "/{id_vehiculo}/mantenimientos",
+    response_model=List[MantenimientoResponse],
+    summary="Listar mantenimientos de un vehículo"
+)
+def listar_mantenimientos(
+    id_vehiculo: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user)
+):
+    vehiculo = db.query(Vehiculo).filter(
+        Vehiculo.id_vehiculo == id_vehiculo,
+        Vehiculo.id_usuario == current_user.id_usuario,
+        Vehiculo.activo == True
+    ).first()
+    
+    if not vehiculo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Vehículo no encontrado"
+        )
+        
+    mantenimientos = db.query(Mantenimiento).filter(
+        Mantenimiento.id_vehiculo == id_vehiculo
+    ).all()
+    
+    return mantenimientos
+
